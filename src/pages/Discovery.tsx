@@ -11,49 +11,60 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LeadCard } from '@/components/leads/LeadCard';
+import { RealLeadCard } from '@/components/leads/RealLeadCard';
 import { useLeads } from '@/contexts/LeadContext';
-import { industries, locations, companySizes } from '@/data/mockData';
-import { Search, Sparkles, Filter, TrendingUp } from 'lucide-react';
+import { useSearchBusinesses } from '@/hooks/useSearchBusinesses';
+import { industries
+
+ } from '@/data/mockData';
+import { Search, Sparkles, TrendingUp, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Slider } from '@/components/ui/slider';
+import { Lead } from '@/types/lead';
+import { toast } from 'sonner';
 
 export default function Discovery() {
-  const { leads, setSelectedLead } = useLeads();
+  const { addLead, setSelectedLead } = useLeads();
+  const { searchBusinesses, isLoading, error, results } = useSearchBusinesses();
   const navigate = useNavigate();
   
   const [filters, setFilters] = useState({
     industry: 'All Industries',
-    location: 'All Locations',
-    size: 'All Sizes',
+    location: '',
     minScore: 0,
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = () => {
-    setIsSearching(true);
-    // Simulate search delay
-    setTimeout(() => {
-      setIsSearching(false);
+  const handleSearch = async () => {
+    try {
+      await searchBusinesses({
+        query: searchQuery || undefined,
+        location: filters.location || undefined,
+        industry: filters.industry !== 'All Industries' ? filters.industry : undefined,
+        maxResults: 20,
+      });
       setHasSearched(true);
-    }, 1500);
+    } catch (err) {
+      toast.error('Search failed. Please check your API key configuration.');
+    }
   };
 
-  const filteredLeads = leads.filter((lead) => {
-    if (filters.industry !== 'All Industries' && lead.industry !== filters.industry) return false;
-    if (filters.location !== 'All Locations' && lead.location !== filters.location) return false;
-    if (filters.size !== 'All Sizes' && lead.size !== filters.size) return false;
-    if (lead.qualityScore < filters.minScore) return false;
-    if (searchQuery && !lead.businessName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+  const handleAddLead = (lead: Lead) => {
+    addLead(lead);
+    toast.success(`Added ${lead.businessName} to your leads`);
+  };
 
-  const handleLeadClick = (lead: typeof leads[0]) => {
+  const handleViewLead = (lead: Lead) => {
     setSelectedLead(lead);
     navigate('/dashboard');
   };
+
+  const filteredResults = results.filter((lead) => {
+    if (lead.qualityScore < filters.minScore) return false;
+    return true;
+  });
+
 
   return (
     <AppLayout>
@@ -98,40 +109,11 @@ export default function Discovery() {
 
             <div className="space-y-2">
               <Label className="text-sm font-medium">Location</Label>
-              <Select
+              <Input
+                placeholder="City, State or Region..."
                 value={filters.location}
-                onValueChange={(value) => setFilters({ ...filters, location: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location} value={location}>
-                      {location}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Company Size</Label>
-              <Select
-                value={filters.size}
-                onValueChange={(value) => setFilters({ ...filters, size: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {companySizes.map((size) => (
-                    <SelectItem key={size} value={size}>
-                      {size}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+              />
             </div>
 
             <div className="space-y-2">
@@ -152,31 +134,39 @@ export default function Discovery() {
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search by business name..."
+                placeholder="Search businesses (e.g., 'dentists', 'coffee shops')..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
             <Button 
               variant="gradient" 
               onClick={handleSearch}
-              disabled={isSearching}
-              className="min-w-[140px]"
+              disabled={isLoading}
+              className="min-w-[160px]"
             >
-              {isSearching ? (
+              {isLoading ? (
                 <>
                   <Sparkles className="w-4 h-4 animate-spin" />
-                  Searching...
+                  Searching Google...
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Find Leads
+                  Find Businesses
                 </>
               )}
             </Button>
           </div>
+
+          {error && (
+            <div className="flex items-center gap-2 mt-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+              <AlertCircle className="w-4 h-4" />
+              {error}
+            </div>
+          )}
         </Card>
 
         {/* Results Section */}
@@ -186,33 +176,33 @@ export default function Discovery() {
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary" />
                 <h2 className="font-semibold text-foreground">
-                  {filteredLeads.length} Leads Found
+                  {filteredResults.length} Businesses Found
                 </h2>
+                <span className="text-sm text-muted-foreground">
+                  (sorted by lowest Google presence)
+                </span>
               </div>
-              <Button variant="outline" size="sm">
-                <Filter className="w-4 h-4 mr-2" />
-                More Filters
-              </Button>
             </div>
 
             <div className="space-y-3">
-              {filteredLeads.map((lead, index) => (
+              {filteredResults.map((lead, index) => (
                 <div 
                   key={lead.id} 
                   className="animate-slide-up"
                   style={{ animationDelay: `${0.05 * index}s` }}
                 >
-                  <LeadCard 
-                    lead={lead} 
-                    onClick={() => handleLeadClick(lead)}
+                  <RealLeadCard 
+                    lead={lead as any}
+                    onAdd={() => handleAddLead(lead)}
+                    onView={() => handleViewLead(lead)}
                   />
                 </div>
               ))}
             </div>
 
-            {filteredLeads.length === 0 && (
+            {filteredResults.length === 0 && (
               <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No leads match your criteria. Try adjusting your filters.</p>
+                <p className="text-muted-foreground">No businesses found. Try a different search or location.</p>
               </Card>
             )}
           </div>
@@ -223,8 +213,10 @@ export default function Discovery() {
             <div className="w-16 h-16 rounded-full bg-gradient-primary mx-auto mb-4 flex items-center justify-center shadow-glow">
               <Search className="w-8 h-8 text-primary-foreground" />
             </div>
-            <h3 className="font-semibold text-foreground mb-2">Ready to discover new leads</h3>
-            <p className="text-muted-foreground mb-4">Set your criteria above and click "Find Leads" to get started</p>
+            <h3 className="font-semibold text-foreground mb-2">Find businesses with low online presence</h3>
+            <p className="text-muted-foreground mb-4">
+              Search for businesses by type and location. Results are sorted by lowest Google presence—perfect leads for AI solutions.
+            </p>
           </Card>
         )}
       </div>
