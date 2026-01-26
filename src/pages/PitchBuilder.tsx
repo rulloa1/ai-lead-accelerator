@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { pitchTemplates, industries } from '@/data/mockData';
+import { pitchTemplates } from '@/data/mockData';
 import { Lead } from '@/types/lead';
 import { 
   Sparkles, 
@@ -25,6 +25,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useGeneratePitch } from '@/hooks/useGeneratePitch';
 
 export default function PitchBuilder() {
   const location = useLocation();
@@ -37,9 +38,10 @@ export default function PitchBuilder() {
   const [businessName, setBusinessName] = useState(leadFromState?.businessName || '');
   const [contactName, setContactName] = useState(leadFromState?.contactName || '');
   const [businessLocation, setBusinessLocation] = useState(leadFromState?.location || '');
-  const [generatedPitch, setGeneratedPitch] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [businessSize, setBusinessSize] = useState(leadFromState?.size || '1-10 employees');
   const [copied, setCopied] = useState(false);
+  
+  const { isGenerating, generatedPitch, setGeneratedPitch, generatePitch } = useGeneratePitch();
 
   const currentTemplate = pitchTemplates.find(t => t.industry === selectedIndustry) || pitchTemplates[0];
 
@@ -49,22 +51,20 @@ export default function PitchBuilder() {
       setBusinessName(leadFromState.businessName);
       setContactName(leadFromState.contactName || '');
       setBusinessLocation(leadFromState.location);
+      setBusinessSize(leadFromState.size);
     }
   }, [leadFromState]);
 
-  const generatePitch = () => {
-    setIsGenerating(true);
-    
-    setTimeout(() => {
-      let pitch = currentTemplate.emailTemplate
-        .replace(/\{\{contactName\}\}/g, contactName || 'there')
-        .replace(/\{\{businessName\}\}/g, businessName || '[Business Name]')
-        .replace(/\{\{location\}\}/g, businessLocation || '[Location]')
-        .replace(/\{\{industry\}\}/g, selectedIndustry);
-      
-      setGeneratedPitch(pitch);
-      setIsGenerating(false);
-    }, 1200);
+  const handleGeneratePitch = () => {
+    generatePitch({
+      businessName: businessName || '[Business Name]',
+      industry: selectedIndustry,
+      location: businessLocation || '[Location]',
+      size: businessSize,
+      contactName: contactName || undefined,
+      painPoints: currentTemplate.painPoints,
+      solutions: currentTemplate.solutions,
+    });
   };
 
   const copyToClipboard = () => {
@@ -197,18 +197,18 @@ export default function PitchBuilder() {
               variant="gradient" 
               size="xl" 
               className="w-full" 
-              onClick={generatePitch}
+              onClick={handleGeneratePitch}
               disabled={isGenerating}
             >
               {isGenerating ? (
                 <>
                   <RefreshCw className="w-5 h-5 animate-spin" />
-                  Generating...
+                  Generating with AI...
                 </>
               ) : (
                 <>
                   <Sparkles className="w-5 h-5" />
-                  Generate Personalized Pitch
+                  Generate AI Pitch
                 </>
               )}
             </Button>
