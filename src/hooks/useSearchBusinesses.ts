@@ -9,9 +9,14 @@ interface SearchParams {
   maxResults?: number;
 }
 
+type SerializedLead = Omit<Lead, 'createdAt' | 'updatedAt'> & {
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};
+
 interface SearchResult {
   success: boolean;
-  data?: Lead[];
+  data?: SerializedLead[];
   total?: number;
   error?: string;
 }
@@ -41,7 +46,7 @@ export function useSearchBusinesses() {
         throw new Error(data?.error || 'Failed to search businesses');
       }
 
-      const leads = (data.data || []).map((business: any) => ({
+      const leads: Lead[] = (data.data || []).map((business) => ({
         ...business,
         createdAt: new Date(business.createdAt),
         updatedAt: new Date(business.updatedAt),

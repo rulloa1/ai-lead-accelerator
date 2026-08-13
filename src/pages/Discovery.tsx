@@ -192,7 +192,7 @@ export default function Discovery() {
                   style={{ animationDelay: `${0.05 * index}s` }}
                 >
                   <RealLeadCard 
-                    lead={lead as any}
+                    lead={lead}
                     onAdd={() => handleAddLead(lead)}
                     onView={() => handleViewLead(lead)}
                   />
